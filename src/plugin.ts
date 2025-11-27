@@ -105,6 +105,7 @@ class BytenodeWebpackPlugin implements WebpackPluginInstance {
         const stats = compilation.getLogger(this.name);
         const loaderOutputFiles: string[] = [];
         const targetOutputFiles: string[] = [];
+        const replacedFiles: Map<string, string> = new Map();
 
         compilation.hooks.processAssets.tap({ name: this.name, stage: Compilation.PROCESS_ASSETS_STAGE_PRE_PROCESS }, (): void => {
           logger.debug('hook: process assets');
@@ -178,7 +179,7 @@ class BytenodeWebpackPlugin implements WebpackPluginInstance {
             }
 
             logger.debug('initializing compiled target replacer');
-
+            // Replace .js with .jsc
             for (const file of targetOutputFiles) {
               raw = replaceImportPath(raw, name, file, fromTargetToCompiledExtension(file), {
                 permutations: [
@@ -186,6 +187,12 @@ class BytenodeWebpackPlugin implements WebpackPluginInstance {
                   normalizeCodePathForWindows,
                 ],
               });
+            }
+            // Replace .jsc with arch judge
+            for (const path of replacedFiles.values()) {
+              // to replace the require path with arch judge
+              const x64Path = replaceString(path, '.jsc', '.x64.jsc');
+              raw = replaceString(raw, path, `process.arch === "x64" ? ${x64Path} : ${path}`);
             }
 
             return raw;
@@ -205,6 +212,13 @@ class BytenodeWebpackPlugin implements WebpackPluginInstance {
               logger.debug('    to:', toTransformed);
 
               raw = replaceString(raw, fromTransformed, toTransformed);
+              const exist = replacedFiles.get(name);
+              if (exist) {
+                const desVal = replaceString(exist, fromTransformed, toTransformed);
+                replacedFiles.set(name, desVal);
+              } else if (from.includes(name.replace('.js', ''))) { // For make sure first replacement matches file name
+                replacedFiles.set(name, `"${toTransformed}`);
+              }
             }
 
             return raw;
@@ -216,7 +230,7 @@ class BytenodeWebpackPlugin implements WebpackPluginInstance {
 
     async function updateTargetWithCompiledCode(compilation: Compilation, name: string, asset: Source, options: Options): Promise<void> {
       logger.debug('compiling asset source', { name });
-      const source = await compileSource(asset, options);
+      const source = await compileSource(asset, { ...options, electronPath: undefined });
 
       logger.debug('updating asset source with the compiled content');
       compilation.updateAsset(name, source);
@@ -225,6 +239,12 @@ class BytenodeWebpackPlugin implements WebpackPluginInstance {
 
       logger.debug(`renaming asset to ${to}`);
       compilation.renameAsset(name, to);
+
+      if (options.electronPath) {
+        const x64Source = await compileSource(asset, options);
+        const to1 = to.replace(/\.jsc$/, '.x64.jsc');
+        compilation.emitAsset(to1, x64Source);
+      }
 
       if (options.keepSource) {
         logger.debug('re-emitting decompiled asset due to plugin.options.keepSource being true');

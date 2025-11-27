@@ -1,6 +1,5 @@
 import type { ValuesType } from 'utility-types';
 import type { EntryNormalized, sources } from 'webpack';
-
 type FileMatcher = (file: string) => boolean;
 type FileMatcherIntent = string | RegExp;
 type FileMatcherIntentMatcher = Pick<RegExp, 'test'>;
@@ -13,6 +12,7 @@ interface Options {
   include?: FileMatcherIntent[];
   keepSource: boolean;
   preventSourceMaps: boolean;
+  electronPath?: string; // to specify a x64 electron path for universal build
 }
 
 interface Prepared {
