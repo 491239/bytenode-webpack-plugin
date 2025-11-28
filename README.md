@@ -80,6 +80,7 @@ interface Options {
   include?: FileMatcherIntent[]; // filter assets to compile, accepts glob and regex
   keepSource: boolean;           // emits the original source files along with the compiled ones
   preventSourceMaps: boolean;    // prevents source maps from being generated
+  electronPath?: string;         // to specify a x64 electron path for universal build on arm platform
 }
 ```
 > Globs are handled using [`picomatch`](https://www.npmjs.com/package/picomatch)
